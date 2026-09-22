@@ -6,74 +6,43 @@ from app.tools.calendar import (
 )
 
 
-# ==========================================
-# 1. CREATE
-# ==========================================
+# CREATE
+created = create_event.invoke({
+    "title": "CRUD Test",
+    "date": "2026-09-23",
+    "time": "19:00",
+})
 
-result = create_event(
-    title="Meeting with Rahul",
-    date="2026-09-23",
-    time="16:00"
-)
+print("\nCREATE:")
+print(created)
 
-print("\nCREATE RESULT:")
-print(result)
-
-
-# Get the event ID
-event_id = result["event"]["id"]
+event_id = created["event"]["id"]
 
 
-# ==========================================
-# 2. LIST
-# ==========================================
+# UPDATE
+updated = update_event.invoke({
+    "event_id": event_id,
+    "title": "Updated CRUD Test",
+    "time": "20:00",
+})
 
-result = list_events()
-
-print("\nLIST RESULT:")
-print(result)
-
-
-# ==========================================
-# 3. UPDATE
-# ==========================================
-
-result = update_event(
-    event_id=event_id,
-    time="17:00"
-)
-
-print("\nUPDATE RESULT:")
-print(result)
+print("\nUPDATE:")
+print(updated)
 
 
-# ==========================================
-# 4. LIST AGAIN
-# ==========================================
+# LIST
+listed = list_events.invoke({
+    "date": "2026-09-23",
+})
 
-result = list_events()
-
-print("\nLIST AFTER UPDATE:")
-print(result)
-
-
-# ==========================================
-# 5. DELETE
-# ==========================================
-
-result = delete_event(
-    event_id=event_id
-)
-
-print("\nDELETE RESULT:")
-print(result)
+print("\nLIST:")
+print(listed)
 
 
-# ==========================================
-# 6. LIST AGAIN
-# ==========================================
+# DELETE
+deleted = delete_event.invoke({
+    "event_id": event_id,
+})
 
-result = list_events()
-
-print("\nFINAL LIST:")
-print(result)
+print("\nDELETE:")
+print(deleted)
