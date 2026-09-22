@@ -5,12 +5,18 @@ from dotenv import load_dotenv
 from openai import OpenAI
 
 
+# ==================================================
+# 1. Load environment variables
+# ==================================================
+
 load_dotenv()
 
 hf_token = os.getenv("HF_TOKEN")
 
 if not hf_token:
-    raise ValueError("HF_TOKEN not found")
+    raise ValueError("HF_TOKEN not found in .env")
+
+
 
 
 client = OpenAI(
@@ -19,24 +25,27 @@ client = OpenAI(
 )
 
 
+
+
 def create_event(title: str, date: str, time: str):
-    """
-    Create a calendar event.
 
-    For now this is only a fake implementation.
-    Later this will communicate with Google Calendar.
-    """
+    print("\n[TOOL] Creating calendar event...")
 
-    print("\n=== CREATE EVENT TOOL EXECUTED ===")
+    print(f"Title: {title}")
+    print(f"Date : {date}")
+    print(f"Time : {time}")
 
-    print(f"Title : {title}")
-    print(f"Date  : {date}")
-    print(f"Time  : {time}")
+    # Fake calendar operation for now
+    # Google Calendar will be connected later.
 
     return {
         "success": True,
-        "message": f"Event '{title}' created successfully."
+        "event_id": "event_12345",
+        "title": title,
+        "date": date,
+        "time": time,
     }
+
 
 
 
@@ -47,16 +56,18 @@ tools = [
             "name": "create_event",
 
             "description": (
-                "Create a calendar event with a title, date and time."
+                "Create a calendar event with a title, "
+                "date and time."
             ),
 
             "parameters": {
                 "type": "object",
 
                 "properties": {
+
                     "title": {
                         "type": "string",
-                        "description": "Title of the calendar event"
+                        "description": "Title of the event"
                     },
 
                     "date": {
@@ -69,7 +80,7 @@ tools = [
                     "time": {
                         "type": "string",
                         "description": (
-                            "Event time in 24-hour HH:MM format"
+                            "Event time in HH:MM 24-hour format"
                         )
                     }
                 },
@@ -85,20 +96,22 @@ tools = [
 ]
 
 
+
 messages = [
+
     {
         "role": "system",
         "content": (
             "You are a calendar assistant. "
-            "Use the available calendar tools when the user "
-            "asks you to perform calendar actions."
+            "Use calendar tools when the user asks "
+            "you to create calendar events."
         )
     },
 
     {
         "role": "user",
         "content": (
-            "Cancel my meeting with Rahul tomorrow."
+            "Create a meeting with Rahul tomorrow at 4 PM."
         )
     }
 ]
@@ -106,9 +119,13 @@ messages = [
 
 
 response = client.chat.completions.create(
+
     model="openai/gpt-oss-120b",
+
     messages=messages,
+
     tools=tools,
+
     tool_choice="auto",
 )
 
@@ -116,40 +133,92 @@ response = client.chat.completions.create(
 
 assistant_message = response.choices[0].message
 
-print("\n=== MODEL RESPONSE ===")
-print(assistant_message)
 
 
 if assistant_message.tool_calls:
 
-    print("\n=== TOOL CALL REQUESTED ===")
+    print("\n[LLM] Tool call requested.")
+
+    
+
+    messages.append(assistant_message)
+
+
 
     for tool_call in assistant_message.tool_calls:
 
-        tool_name = tool_call.function.name
+        function_name = tool_call.function.name
 
-        arguments = json.loads(
+        function_args = json.loads(
             tool_call.function.arguments
         )
 
-        print(f"\nTool: {tool_name}")
-        print(f"Arguments: {arguments}")
+        print("\n[LLM] Requested tool:")
+        print(function_name)
 
-        if tool_name == "create_event":
+        print("\n[LLM] Arguments:")
+        print(function_args)
+
+
+
+        if function_name == "create_event":
 
             result = create_event(
-                title=arguments["title"],
-                date=arguments["date"],
-                time=arguments["time"]
+                title=function_args["title"],
+                date=function_args["date"],
+                time=function_args["time"],
             )
 
-            print("\nTool result:")
-            print(result)
+
+
+        else:
+
+            result = {
+                "success": False,
+                "error": f"Unknown tool: {function_name}"
+            }
+
+
+        
+
+        messages.append({
+
+            "role": "tool",
+
+            "tool_call_id": tool_call.id,
+
+            "name": function_name,
+
+            "content": json.dumps(result),
+        })
+
+
+    final_response = client.chat.completions.create(
+
+        model="openai/gpt-oss-120b",
+
+        messages=messages,
+
+    )
+
+
+
+    print("\n========================================")
+
+    print("FINAL RESPONSE:")
+
+    print("========================================")
+
+    print(
+        final_response
+        .choices[0]
+        .message
+        .content
+    )
+
 
 else:
 
-    print("\nModel did not request a tool.")
+    print("\nLLM answered without using a tool:")
 
-    print("\nModel said:")
     print(assistant_message.content)
-
