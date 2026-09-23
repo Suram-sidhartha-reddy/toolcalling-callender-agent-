@@ -3,6 +3,7 @@ from app.tools.calendar import (
     list_events,
     update_event,
     delete_event,
+    find_free_slots,
 )
 
 TOOLS = [
@@ -10,4 +11,5 @@ TOOLS = [
     list_events,
     update_event,
     delete_event,
+    find_free_slots,
 ]

@@ -196,3 +196,67 @@ def delete_event(event_id: str):
             "success": False,
             "error": str(e),
         }
+
+
+
+
+
+@tool
+def find_free_slots(
+    date: str,
+    start_hour: int = 9,
+    end_hour: int = 18,
+):
+    """
+    Find available one-hour time slots in the user's Google Calendar
+    for a specific date.
+
+    date must be in YYYY-MM-DD format.
+    start_hour and end_hour define the working-hour window.
+    """
+
+    service = get_calendar_service()
+
+    params = {
+        "calendarId": "primary",
+        "timeMin": f"{date}T00:00:00+05:30",
+        "timeMax": f"{date}T23:59:59+05:30",
+        "singleEvents": True,
+        "orderBy": "startTime",
+    }
+
+    result = service.events().list(**params).execute()
+
+    events = result.get("items", [])
+
+    busy_hours = set()
+
+    for event in events:
+        start = event.get("start", {}).get("dateTime")
+
+        if not start:
+            continue
+
+        # Extract hour from:
+        # 2026-09-24T14:00:00+05:30
+        event_time = datetime.fromisoformat(start)
+
+        busy_hours.add(event_time.hour)
+
+    free_slots = []
+
+    for hour in range(start_hour, end_hour):
+        if hour not in busy_hours:
+            start_time = f"{hour:02d}:00"
+            end_time = f"{hour + 1:02d}:00"
+
+            free_slots.append({
+                "start": start_time,
+                "end": end_time,
+            })
+
+    return {
+        "success": True,
+        "date": date,
+        "free_slots": free_slots,
+    }
