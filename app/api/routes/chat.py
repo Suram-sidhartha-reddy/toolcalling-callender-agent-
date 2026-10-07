@@ -1,8 +1,9 @@
 from fastapi import APIRouter, Depends
 
-from app.agent import run_agent
 from app.dependencies.common import get_request_id
+from app.dependencies.services import get_chat_service
 from app.schemas.chat import ChatRequest, ChatResponse
+from app.services.chat_service import ChatService
 
 
 router = APIRouter()
@@ -12,14 +13,9 @@ router = APIRouter()
 def chat(
     request: ChatRequest,
     request_id: str = Depends(get_request_id),
+    service: ChatService = Depends(get_chat_service),
 ):
-    response = run_agent(
-        user_message=request.message,
-        source=request.source,
-        sender=request.sender,
-    )
-
-    return ChatResponse(
-        response=response,
+    return service.process_chat(
+        request=request,
         request_id=request_id,
     )
