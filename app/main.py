@@ -1,8 +1,8 @@
-from fastapi import FastAPI
-from pydantic import BaseModel
+from fastapi import FastAPI, Request
+from fastapi.responses import JSONResponse
 
-from app.agent import run_agent
-#from app.watsapp.webhook import router as whatsapp_router
+from app.api.router import router
+from app.middleware.request_id import RequestIDMiddleware
 
 
 app = FastAPI(
@@ -12,35 +12,41 @@ app = FastAPI(
 )
 
 
-class ChatRequest(BaseModel):
-    message: str
-    source: str = "user_command"
-    sender: str | None = None
+# ----------------------------------------
+# Middleware
+# ----------------------------------------
+
+app.add_middleware(RequestIDMiddleware)
 
 
-class ChatResponse(BaseModel):
-    response: str
+# ----------------------------------------
+# API routes
+# ----------------------------------------
+
+app.include_router(
+    router,
+    prefix="/api/v1",
+)
 
 
-@app.get("/")
-def root():
-    return {
-        "status": "ok",
-        "message": "Calendar AI Agent is running",
-    }
+# ----------------------------------------
+# Global exception handler
+# ----------------------------------------
 
-
-@app.post("/chat", response_model=ChatResponse)
-def chat(request: ChatRequest):
-    response = run_agent(
-        user_message=request.message,
-        source=request.source,
-        sender=request.sender,
+@app.exception_handler(Exception)
+async def global_exception_handler(
+    request: Request,
+    exc: Exception,
+):
+    return JSONResponse(
+        status_code=500,
+        content={
+            "error": "internal_server_error",
+            "message": "An unexpected error occurred.",
+            "request_id": getattr(
+                request.state,
+                "request_id",
+                None,
+            ),
+        },
     )
-
-    return {
-        "response": response
-    }
-
-
-#app.include_router(whatsapp_router)

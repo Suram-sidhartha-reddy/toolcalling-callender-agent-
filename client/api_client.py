@@ -37,7 +37,7 @@ class CalendarAPIClient:
 
         try:
             response = httpx.get(
-                f"{self.base_url}/",
+                f"{self.base_url}/api/v1/health/",
                 timeout=self.timeout,
             )
 
@@ -72,7 +72,7 @@ class CalendarAPIClient:
 
         try:
             response = httpx.post(
-                f"{self.base_url}/chat",
+                f"{self.base_url}/api/v1/chat",
                 json=payload,
                 timeout=self.timeout,
             )
