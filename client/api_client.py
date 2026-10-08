@@ -59,16 +59,17 @@ class CalendarAPIClient:
         message: str,
         source: str = "user_command",
         sender: str | None = None,
+        conversation_id: str | None = None,
     ) -> dict[str, Any]:
-        """
-        Send a message to the Calendar AI Agent.
-        """
 
         payload = {
             "message": message,
             "source": source,
             "sender": sender,
         }
+
+        if conversation_id:
+            payload["conversation_id"] = conversation_id
 
         try:
             response = httpx.post(

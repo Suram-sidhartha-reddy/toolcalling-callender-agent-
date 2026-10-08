@@ -4,6 +4,8 @@ from fastapi.responses import JSONResponse
 from app.api.router import router
 from app.middleware.request_id import RequestIDMiddleware
 
+from app.domain.exceptions import ConversationNotFoundError
+
 
 app = FastAPI(
     title="Calendar AI Agent",
@@ -43,6 +45,24 @@ async def global_exception_handler(
         content={
             "error": "internal_server_error",
             "message": "An unexpected error occurred.",
+            "request_id": getattr(
+                request.state,
+                "request_id",
+                None,
+            ),
+        },
+    )
+
+@app.exception_handler(ConversationNotFoundError)
+async def conversation_not_found_handler(
+    request: Request,
+    exc: ConversationNotFoundError,
+):
+    return JSONResponse(
+        status_code=404,
+        content={
+            "error": "conversation_not_found",
+            "message": str(exc),
             "request_id": getattr(
                 request.state,
                 "request_id",

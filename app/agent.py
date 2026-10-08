@@ -15,6 +15,12 @@ from langgraph.prebuilt import (
     tools_condition,
 )
 
+from langchain_core.messages import (
+    AIMessage,
+    HumanMessage,
+    SystemMessage,
+)
+
 from app.tools.registry import TOOLS
 from app.utils.dateandtime import get_current_date
 
@@ -161,23 +167,44 @@ def run_agent(
     user_message: str,
     source: str = "user_command",
     sender: str | None = None,
-) -> str:
+    history: list[dict[str, str]] | None = None,
+):
 
     system_prompt = build_system_prompt(
         source=source,
         sender=sender,
     )
 
-    result = app.invoke({
-        "messages": [
-            SystemMessage(
-                content=system_prompt
-            ),
-            {
-                "role": "user",
-                "content": user_message,
-            },
-        ]
-    })
+    messages = [
+        SystemMessage(content=system_prompt),
+    ]
+
+    for item in history or []:
+
+        if item["role"] == "user":
+            messages.append(
+                HumanMessage(
+                    content=item["content"]
+                )
+            )
+
+        elif item["role"] == "assistant":
+            messages.append(
+                AIMessage(
+                    content=item["content"]
+                )
+            )
+
+    messages.append(
+        HumanMessage(
+            content=user_message
+        )
+    )
+
+    result = app.invoke(
+        {
+            "messages": messages
+        }
+    )
 
     return result["messages"][-1].content
