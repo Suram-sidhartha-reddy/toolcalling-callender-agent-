@@ -5,6 +5,9 @@ from sqlalchemy.orm import Session
 
 from app.db.models import Conversation
 from app.domain.exceptions import ConversationNotFoundError
+from sqlalchemy import update, func
+
+
 
 
 class ConversationRepository:
@@ -43,3 +46,12 @@ class ConversationRepository:
         self.db.flush()
 
         return conversation
+    def touch(self, conversation_id, user_id) -> None:
+        self.db.execute(
+            update(Conversation)
+            .where(
+                Conversation.id == conversation_id,
+                Conversation.user_id == user_id,
+            )
+            .values(updated_at=func.now())
+        )

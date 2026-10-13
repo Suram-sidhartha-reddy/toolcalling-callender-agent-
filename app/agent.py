@@ -1,8 +1,8 @@
-import os
-
-from dotenv import load_dotenv
-from langchain_openai import ChatOpenAI
-from langchain_core.messages import SystemMessage
+from langchain_core.messages import (
+    AIMessage,
+    HumanMessage,
+    SystemMessage,
+)
 
 from langgraph.graph import (
     MessagesState,
@@ -15,43 +15,42 @@ from langgraph.prebuilt import (
     tools_condition,
 )
 
-from langchain_core.messages import (
-    AIMessage,
-    HumanMessage,
-    SystemMessage,
-)
-
+from app.llm.provider import create_llm
 from app.tools.registry import TOOLS
 from app.utils.dateandtime import get_current_date
 
 
-load_dotenv()
+# ==========================================================
+# LLM PROVIDER
+# ==========================================================
+
+llm, supports_tools = create_llm()
 
 
-hf_token = os.getenv("HF_TOKEN")
-
-if not hf_token:
-    raise ValueError("HF_TOKEN not found in .env")
-
-
-llm = ChatOpenAI(
-    model="openai/gpt-oss-120b",
-    base_url="https://router.huggingface.co/v1",
-    api_key=hf_token,
-)
+if supports_tools:
+    llm_with_tools = llm.bind_tools(TOOLS)
+else:
+    llm_with_tools = llm
 
 
-llm_with_tools = llm.bind_tools(TOOLS)
+# ==========================================================
+# SYSTEM PROMPT
+# ==========================================================
 
-
-
-def build_system_prompt(source: str, sender: str | None = None):
+def build_system_prompt(
+    source: str,
+    sender: str | None = None,
+) -> str:
 
     current_date = get_current_date()
 
     if source == "incoming_message":
 
-        sender_text = sender if sender else "another person"
+        sender_text = (
+            sender
+            if sender
+            else "another person"
+        )
 
         return f"""
 You are an AI calendar assistant.
@@ -71,14 +70,11 @@ Important rules:
 2. Do not create, update, or delete calendar events just because
    another person requested something.
 3. You may read the user's calendar to determine availability.
-4. Use find_free_slots when someone asks about the user's availability.
-5. Use list_events when you need to inspect calendar events.
-6. If the sender proposes a meeting time, check whether that time
-   is available before responding.
-7. Do not create a calendar event unless the user explicitly asks
-   you to create one.
-8. After using tools, provide a natural-language response that the
-   user could send back to the sender.
+4. Use find_free_slots when someone asks about availability.
+5. Use list_events when you need to inspect events.
+6. If the sender proposes a meeting time, check availability first.
+7. Do not create an event unless the user explicitly asks you to.
+8. After using tools, provide a natural-language response.
 
 Interpret the message carefully.
 """
@@ -92,7 +88,8 @@ The user is directly interacting with you.
 
 You can manage the user's Google Calendar using the available tools.
 
-Use the calendar tools when necessary to:
+Use calendar tools when necessary to:
+
 - create events
 - list events
 - update events
@@ -102,12 +99,14 @@ Use the calendar tools when necessary to:
 When the user explicitly asks you to modify the calendar,
 use the appropriate tool.
 
-Do not claim an action was completed unless the tool successfully
-performed it.
+Do not claim an action was completed unless the tool
+successfully performed it.
 """
 
 
-
+# ==========================================================
+# LLM NODE
+# ==========================================================
 
 def call_llm(state):
 
@@ -120,55 +119,58 @@ def call_llm(state):
     }
 
 
-
+# ==========================================================
+# TOOL NODE
+# ==========================================================
 
 tool_node = ToolNode(TOOLS)
 
 
+# ==========================================================
+# GRAPH
+# ==========================================================
 
 graph = StateGraph(MessagesState)
 
-
 graph.add_node(
     "llm",
-    call_llm
+    call_llm,
 )
-
 
 graph.add_node(
     "tools",
-    tool_node
+    tool_node,
 )
-
 
 graph.add_edge(
     START,
-    "llm"
+    "llm",
 )
-
 
 graph.add_conditional_edges(
     "llm",
     tools_condition,
 )
 
-
 graph.add_edge(
     "tools",
-    "llm"
+    "llm",
 )
 
 
 app = graph.compile()
 
 
+# ==========================================================
+# AGENT ENTRY POINT
+# ==========================================================
 
 def run_agent(
     user_message: str,
     source: str = "user_command",
     sender: str | None = None,
     history: list[dict[str, str]] | None = None,
-):
+) -> str:
 
     system_prompt = build_system_prompt(
         source=source,
@@ -176,30 +178,49 @@ def run_agent(
     )
 
     messages = [
-        SystemMessage(content=system_prompt),
+        SystemMessage(
+            content=system_prompt
+        )
     ]
+
+    # ------------------------------------------------------
+    # Restore previous conversation history
+    # ------------------------------------------------------
 
     for item in history or []:
 
-        if item["role"] == "user":
+        role = item.get("role")
+        content = item.get("content", "")
+
+        if role == "user":
+
             messages.append(
                 HumanMessage(
-                    content=item["content"]
+                    content=content
                 )
             )
 
-        elif item["role"] == "assistant":
+        elif role == "assistant":
+
             messages.append(
                 AIMessage(
-                    content=item["content"]
+                    content=content
                 )
             )
+
+    # ------------------------------------------------------
+    # Add current user message
+    # ------------------------------------------------------
 
     messages.append(
         HumanMessage(
             content=user_message
         )
     )
+
+    # ------------------------------------------------------
+    # Run graph
+    # ------------------------------------------------------
 
     result = app.invoke(
         {

@@ -107,6 +107,10 @@ class ChatService:
             role="assistant",
             content=response,
         )
+        self.conversations.touch(
+            conversation_id=conversation.id,
+            user_id=user_id,
+        )
 
         self.db.commit()
 

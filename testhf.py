@@ -22,7 +22,7 @@ client = OpenAI(
 
 
 # Send request to Hugging Face
-response = client.chat.completions.create(
+"""response = client.chat.completions.create(
     model="openai/gpt-oss-120b",
     messages=[
         {
@@ -31,8 +31,9 @@ response = client.chat.completions.create(
         }
     ],
 )
-
+"""
 
 # Print response
 print("\nMODEL RESPONSE:\n")
-print(response.choices[0].message.content)
+print(hf_token)
+#print(response.choices[0].message.content)
